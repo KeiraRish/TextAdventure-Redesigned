@@ -44,6 +44,33 @@ st.markdown(
         margin-bottom: 1rem;
     }
 
+    .story-output-card {
+        margin-bottom: 0.75rem;
+    }
+
+    .story-output-pane {
+        height: 360px;
+        max-height: 360px;
+        min-height: 360px;
+        overflow-y: auto;
+        padding: 0.9rem 1rem;
+        border: 1px solid #f4dce6;
+        border-radius: 14px;
+        background: #fffdfd;
+        scrollbar-gutter: stable;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        gap: 0.35rem;
+    }
+
+    .story-output-line {
+        margin: 0;
+        line-height: 1.45;
+        white-space: pre-line;
+        color: var(--text);
+    }
+
     .pill {
         display: inline-block;
         background: #ffe8f0;
@@ -54,21 +81,14 @@ st.markdown(
         margin: 0.2rem 0.25rem 0.2rem 0;
     }
 
-    .story-box {
-        max-height: 360px;
-        overflow-y: auto;
-        padding-right: 0.35rem;
-    }
-
-    .story-box p {
-        margin: 0;
-        line-height: 1.45;
-        white-space: pre-line;
-    }
     </style>
     """,
     unsafe_allow_html=True,
 )
+
+
+ACTION_BREAK_MARKER = "__ACTION_BREAK__"
+OUTFIT_REDO_ENTRY = "Great! Now that your outfit is chosen, you walk over to your desk and notice your backpack is a tiny disaster. You still have a little time before the day gets truly unhinged."
 
 
 def init_game():
@@ -77,10 +97,11 @@ def init_game():
     st.session_state.story = [
         "The morning sun spills across your apartment, and your day is about to begin.",
         "A little sparkle of chaos is already waiting in the air.",
+        ACTION_BREAK_MARKER,
     ]
-    st.session_state.story_render_length = 0
     st.session_state.backpack = []
     st.session_state.stage = "intro"
+    st.session_state.outfit_redo_shown = False
     st.session_state.temp_health = None
     st.session_state.recipe = None
     st.session_state.ingredients = []
@@ -95,6 +116,17 @@ if "health" not in st.session_state:
 
 def add_story(text):
     st.session_state.story.append(text)
+
+
+def add_action_break():
+    if st.session_state.story and st.session_state.story[-1] != ACTION_BREAK_MARKER:
+        st.session_state.story.append(ACTION_BREAK_MARKER)
+
+
+def move_story_line_to_last(line):
+    if line in st.session_state.story:
+        st.session_state.story = [item for item in st.session_state.story if item != line]
+        st.session_state.story.append(line)
 
 
 def get_room_from_stage(stage):
@@ -157,20 +189,43 @@ left, right = st.columns([2, 1])
 
 with left:
     story_lines = [line for line in st.session_state.story if line]
-    previous_story_length = st.session_state.get("story_render_length", len(story_lines))
-    start_index = previous_story_length if len(story_lines) > previous_story_length else 0
+    story_segments = []
+    for line in story_lines:
+        if line == ACTION_BREAK_MARKER:
+            story_segments.append("<div class='story-output-line' style='height:0.6rem'></div>")
+        else:
+            story_segments.append(f"<p class='story-output-line'>{html.escape(line).replace(chr(10), '<br>')}</p>")
 
-    story_parts = []
-    for index, line in enumerate(story_lines):
-        if index == start_index and index > 0:
-            story_parts.append("<br><br>")
-        story_parts.append(html.escape(line))
-        if index < len(story_lines) - 1:
-            story_parts.append("<br>")
+    story_content = "".join(story_segments) or "<p class='story-output-line'>A little sparkle is waiting for you in the next room.</p>"
 
-    story_text = "".join(story_parts)
-    st.session_state.story_render_length = len(story_lines)
-    st.markdown(f"<div class='card'><div class='story-box'><p>{story_text or html.escape('A little sparkle is waiting for you in the next room.')}</p></div></div>", unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div class='card story-output-card'>
+            <h4 style='margin-top:0; color:#b05077;'>Output</h4>
+            <div id='story-output-pane' class='story-output-pane'>
+                {story_content}
+            </div>
+        </div>
+        <script>
+        const scrollOutputArea = () => {{
+            const pane = document.getElementById('story-output-pane');
+            if (pane) {{
+                requestAnimationFrame(() => {{
+                    pane.scrollTop = pane.scrollHeight;
+                }});
+                setTimeout(() => {{ pane.scrollTop = pane.scrollHeight; }}, 50);
+            }}
+        }};
+        scrollOutputArea();
+        window.addEventListener('load', scrollOutputArea);
+        setTimeout(scrollOutputArea, 0);
+        setTimeout(scrollOutputArea, 100);
+        setTimeout(scrollOutputArea, 250);
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
 
     if st.session_state.health <= 0 and st.session_state.stage != "game_over":
         st.session_state.stage = "game_over"
@@ -188,6 +243,7 @@ with left:
             add_story("Unfortunately, it is a school day and you have lots to do.")
             add_story("You really should get out of bed, but what do you want to do?")
             st.session_state.stage = "bed_choice"
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "bed_choice":
@@ -195,10 +251,12 @@ with left:
         if st.button("Get up", use_container_width=True):
             add_story("Yay! Good morning! Time to start your day.")
             st.session_state.stage = "bed_make"
+            add_action_break()
             st.rerun()
         if st.button("Stay in bed", use_container_width=True):
             change_health(-10, "How lazy of you. Your happiness decreases by 10.")
             st.session_state.stage = "bed_choice"
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "bed_make":
@@ -208,12 +266,14 @@ with left:
             st.session_state.temp_health = st.session_state.health
             st.session_state.outfit_started = True
             st.session_state.stage = "closet_bottoms"
+            add_action_break()
             st.rerun()
         if st.button("No, leave it messy", use_container_width=True):
             change_health(-10, "How lazy of you. Your happiness decreases by 10 points.")
             st.session_state.temp_health = st.session_state.health
             st.session_state.outfit_started = True
             st.session_state.stage = "closet_bottoms"
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "closet_bottoms":
@@ -227,6 +287,7 @@ with left:
             else:
                 change_health(-15, "Bad choice, you will be too warm. Happiness decreases by 15.")
             st.session_state.stage = "closet_tops"
+            add_action_break()
             st.rerun()
         if st.button("Leggings", use_container_width=True):
             if st.session_state.temperature < 60:
@@ -234,6 +295,7 @@ with left:
             else:
                 change_health(-15, "Bad choice, you will be too warm. Happiness decreases by 15.")
             st.session_state.stage = "closet_tops"
+            add_action_break()
             st.rerun()
         if st.button("Shorts", use_container_width=True):
             if st.session_state.temperature < 60:
@@ -241,6 +303,7 @@ with left:
             else:
                 change_health(5, "Good choice! You will be nice and comfortable. Happiness increases by 5.")
             st.session_state.stage = "closet_tops"
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "closet_tops":
@@ -251,6 +314,7 @@ with left:
             else:
                 change_health(-15, "Bad choice, you will be too warm. Happiness decreases by 15.")
             st.session_state.stage = "closet_coat"
+            add_action_break()
             st.rerun()
         if st.button("Long sleeve", use_container_width=True):
             if st.session_state.temperature < 60:
@@ -258,6 +322,7 @@ with left:
             else:
                 change_health(-15, "Bad choice, you will be too warm. Happiness decreases by 15.")
             st.session_state.stage = "closet_coat"
+            add_action_break()
             st.rerun()
         if st.button("T-shirt", use_container_width=True):
             if st.session_state.temperature < 60:
@@ -265,6 +330,7 @@ with left:
             else:
                 change_health(5, "Good choice! You will be nice and comfortable. Happiness increases by 5.")
             st.session_state.stage = "closet_coat"
+            add_action_break()
             st.rerun()
         if st.button("Tank top", use_container_width=True):
             if st.session_state.temperature < 60:
@@ -272,6 +338,7 @@ with left:
             else:
                 change_health(5, "Good choice! You will be nice and comfortable. Happiness increases by 5.")
             st.session_state.stage = "closet_coat"
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "closet_coat":
@@ -282,6 +349,7 @@ with left:
             else:
                 change_health(-15, "Bad choice, you will be way too warm. Happiness decreases by 15.")
             st.session_state.stage = "outfit_redo"
+            add_action_break()
             st.rerun()
         if st.button("No, skip the coat", use_container_width=True):
             if st.session_state.temperature < 35:
@@ -289,13 +357,13 @@ with left:
             else:
                 change_health(5, "Good choice, you didn't need one anyway. Happiness increases by 5.")
             st.session_state.stage = "outfit_redo"
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "outfit_redo":
-        st.markdown(
-            "<div class='card'><p>Great! Now that your outfit is chosen, you walk over to your desk and notice your backpack is a tiny disaster. You still have a little time before the day gets truly unhinged.</p></div>",
-            unsafe_allow_html=True,
-        )
+        if not st.session_state.outfit_redo_shown:
+            add_story("Great! Now that your outfit is chosen, you walk over to your desk and notice your backpack is a tiny disaster. You still have a little time before the day gets truly unhinged.")
+            st.session_state.outfit_redo_shown = True
         st.markdown(
             f"<div class='card'><p>Keeping in mind that your happiness could drop to zero, would you like to redo your outfit? If you do, your happiness will reset to {st.session_state.temp_health - 15} for the sake of extra laundry and extra chaos.</p></div>",
             unsafe_allow_html=True,
@@ -304,10 +372,15 @@ with left:
             st.session_state.health = st.session_state.temp_health - 15
             add_story("You decide to redo your outfit, which feels very dramatic and mildly chaotic.")
             st.session_state.stage = "closet_bottoms"
+            add_action_break()
             st.rerun()
         if st.button("No, this outfit is fabulous", use_container_width=True):
             add_story("You decide to leave your outfit exactly as it is. The sparkle is enough.")
+            if OUTFIT_REDO_ENTRY in st.session_state.story:
+                st.session_state.story = [item for item in st.session_state.story if item != OUTFIT_REDO_ENTRY]
+            st.session_state.story.append(OUTFIT_REDO_ENTRY)
             st.session_state.stage = "desk_choice"
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "desk_choice":
@@ -318,17 +391,21 @@ with left:
         if st.button("Makeup", use_container_width=True):
             change_health(10, "You put on a little mascara and lip gloss. You feel pretty and your happiness increases by 10.")
             st.session_state.stage = "backpack_pack"
+            add_action_break()
             st.rerun()
         if st.button("Hair", use_container_width=True):
             st.session_state.stage = "hair_choice_2"
+            add_action_break()
             st.rerun()
         if st.button("Both", use_container_width=True):
             change_health(10, "You give yourself a little makeup moment and a little hair moment. The sparkle level is now dangerously high.")
             st.session_state.stage = "backpack_pack"
+            add_action_break()
             st.rerun()
         if st.button("Neither", use_container_width=True):
             add_story("You decide to leave the desk as is and move on. The morning is already doing enough.")
             st.session_state.stage = "backpack_pack"
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "hair_choice_2":
@@ -336,14 +413,17 @@ with left:
         if st.button("Leave down", use_container_width=True):
             change_health(10, "Your hair looks so pretty down. Happiness increases by 10.")
             st.session_state.stage = "backpack_pack"
+            add_action_break()
             st.rerun()
         if st.button("Claw clip", use_container_width=True):
             change_health(10, "Somehow it looks good on the first try. Happiness increases by 10.")
             st.session_state.stage = "backpack_pack"
+            add_action_break()
             st.rerun()
         if st.button("Ponytail", use_container_width=True):
             change_health(10, "Somehow your ponytail looks good on the first try. Happiness increases by 10.")
             st.session_state.stage = "backpack_pack"
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "backpack_pack":
@@ -371,29 +451,35 @@ with left:
                         add_story(f"You packed {item}. The backpack is now slightly more chaotic and slightly more fabulous.")
                 else:
                     add_story(f"You already packed {item}. The chaos is becoming repetitive.")
+                add_action_break()
                 st.rerun()
         if st.button("Done packing", use_container_width=True):
             add_story("You step back and admire your very overpacked backpack. It is a masterpiece of organization and panic.")
             st.session_state.stage = "destination"
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "destination":
         st.markdown("<div class='card'><p>You exit your bedroom and walk into the hall. You can choose to head into the kitchen or the living room before you leave the apartment.</p></div>", unsafe_allow_html=True)
         if st.button("Kitchen", use_container_width=True):
             transition_stage("kitchen_intro", "You step into the kitchen and the smell of breakfast drifts through the air.")
+            add_action_break()
             st.rerun()
         if st.button("Living Room", use_container_width=True):
             transition_stage("living_room", "You step into the living room and the day feels a little more real.")
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "kitchen_intro":
         st.markdown("<div class='card'><p>You walk into your kitchen and realize how hungry you are. Would you like to make breakfast?</p></div>", unsafe_allow_html=True)
         if st.button("Yes, make breakfast", use_container_width=True):
             transition_stage("kitchen_recipe")
+            add_action_break()
             st.rerun()
         if st.button("No, skip breakfast", use_container_width=True):
             change_health(-20, "Breakfast is really good for you. You should not skip it. Happiness decreases by 20.")
             transition_stage("living_room", "You leave the kitchen behind and drift into the living room.")
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "kitchen_recipe":
@@ -402,16 +488,19 @@ with left:
             st.session_state.recipe = "Scrambled eggs"
             st.session_state.ingredients = []
             st.session_state.stage = "kitchen_gather"
+            add_action_break()
             st.rerun()
         if st.button("Pancakes", use_container_width=True):
             st.session_state.recipe = "Pancakes"
             st.session_state.ingredients = []
             st.session_state.stage = "kitchen_gather"
+            add_action_break()
             st.rerun()
         if st.button("Oatmeal", use_container_width=True):
             st.session_state.recipe = "Oatmeal"
             st.session_state.ingredients = []
             st.session_state.stage = "kitchen_gather"
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "kitchen_gather":
@@ -419,19 +508,23 @@ with left:
         if st.button("Go to the fridge", use_container_width=True):
             st.session_state.ingredient_source = "fridge"
             st.session_state.stage = "kitchen_pick"
+            add_action_break()
             st.rerun()
         if st.button("Go to the pantry", use_container_width=True):
             st.session_state.ingredient_source = "pantry"
             st.session_state.stage = "kitchen_pick"
+            add_action_break()
             st.rerun()
         if st.button("Done gathering ingredients", use_container_width=True):
             if len(st.session_state.ingredients) >= 2:
                 add_story("You have everything you need and the breakfast comes together beautifully.")
                 change_health(20, "Yay! You eat your delicious breakfast. Happiness increases by 20.")
                 st.session_state.stage = "living_room"
+                add_action_break()
                 st.rerun()
             else:
                 add_story("You still need a few more ingredients before you can cook.")
+                add_action_break()
                 st.rerun()
 
     elif st.session_state.stage == "kitchen_pick":
@@ -450,9 +543,11 @@ with left:
                     add_story(f"You gathered {item} for your breakfast.")
                 else:
                     add_story(f"You already grabbed {item}. The kitchen has a little too much drama today.")
+                add_action_break()
                 st.rerun()
         if st.button("Back to kitchen menu", use_container_width=True):
             st.session_state.stage = "kitchen_gather"
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "living_room":
@@ -464,13 +559,16 @@ with left:
                 st.session_state.backpack.append("Book")
             add_story("Perfect! Your backpack now feels a little more prepared for the day.")
             transition_stage("ending", "You gather your things and head out, feeling a little more ready for the day.")
+            add_action_break()
             st.rerun()
         if st.button("No, leave them behind", use_container_width=True):
             add_story("Okay. You leave the items behind and head out, slightly more chaotic than before.")
             transition_stage("ending", "You leave the items behind and head out, slightly more chaotic than before.")
+            add_action_break()
             st.rerun()
 
     elif st.session_state.stage == "ending":
+        st.session_state.previous_stage = st.session_state.stage
         st.markdown(
             "<div class='card'><p>Now that you are completely ready to take on the day, you run out the door, almost forgetting your car keys on the way out. The morning was chaotic, sparkly, and somehow still charming.</p></div>",
             unsafe_allow_html=True,
@@ -499,4 +597,5 @@ with right:
 
     if st.button("Start over", use_container_width=True):
         init_game()
+        add_action_break()
         st.rerun()

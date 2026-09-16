@@ -31,9 +31,10 @@ st.markdown(
     [data-testid="stForm"] [data-testid="stFormSubmitButton"] { width:180px; margin:1rem auto 0; }
     form:has(.welcome-card), [data-testid="stForm"] { width:min(100%, 650px) !important; min-height:78vh !important; box-sizing:border-box; }
     .panel { background:rgba(255,255,255,.88); border:1px solid var(--line); border-radius:16px; padding:.8rem 1rem; box-shadow:0 8px 22px rgba(210,126,158,.1); margin-bottom:.7rem; }
-    .story { height:260px; overflow-y:auto; padding:.8rem; border:1px solid var(--line); border-radius:12px; background:var(--paper); display:flex; flex-direction:column; justify-content:flex-end; gap:.45rem; }
+    .story { height:260px; overflow:auto; padding:.8rem; border:1px solid var(--line); border-radius:12px; background:var(--paper); display:flex; flex-direction:column; justify-content:flex-end; gap:.45rem; }
     .story p { margin:0; line-height:1.5; }
-    .story .art { white-space:pre; overflow-x:auto; color:#a95278; font:11px/1.05 ui-monospace, SFMono-Regular, Menlo, monospace; background:#fff5f8; padding:.8rem; border-radius:12px; }
+    .story:has(.art) { height:520px; justify-content:flex-start; }
+    .story .art { white-space:pre; overflow:visible; color:#a95278; font:16px/1 ui-monospace, SFMono-Regular, Menlo, monospace; background:#fff5f8; padding:.8rem; border-radius:12px; min-width:max-content; }
     .eyebrow { color:#b45d81; text-transform:uppercase; letter-spacing:.12em; font-size:.74rem; font-weight:700; }
     .rules { color:#a95278; font-size:.78rem; line-height:1.45; }
     .rules strong { color:#b45d81; }
@@ -51,17 +52,36 @@ st.markdown(
 
 ACTION_BREAK = "__ACTION_BREAK__"
 PANCAKE_ART = r"""
-                 .-''''-.
-                                /  .--.  \
-                             /  /    \  \
-               |  |    |  |
-                             \  \____/  /
-                '._    _.'
-                   |  |
-              .----'  '----.
-                         /              \
-                        /   pancakes!    \
-                     /__________________\
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⡀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⠤⠲⢉⡽⢈⣠⡞⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠎⢀⠄⢢⠫⡀⠸⣇⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⠃⡠⠃⠀⡇⠀⠱⠀⠀⠀⠉⠒⠤⢀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⠤⠋⢀⠇⠀⠀⠱⡀⠀⠑⢄⠀⠈⠐⠒⠤⡀⠑⢦⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡠⣜⣻⣿⠿⠃⠠⠜⠃⠀⠀⠀⠀⠘⢄⡀⠀⠛⠤⠀⠀⠀⠘⡄⣸⣧⣘⡠⠤⢀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡠⢤⢲⠽⣿⣿⡿⠁⡄⠀⠀⠀⢀⠡⢄⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⢈⣿⣿⣿⣿⣿⣶⣬⣑⡠⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⢤⠲⣍⡾⢣⢋⡕⣊⠿⡇⠀⣧⠀⠀⠀⠀⠀⠀⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⣿⣿⣿⣿⣿⣿⣿⣷⣦⣑⢄⡀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⢠⢊⢧⣋⢛⣥⣲⣥⣮⣴⣵⣾⣧⠀⢣⠱⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣮⣂⠄⡀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⢠⢧⣛⣴⣾⣿⡿⣿⣿⢿⣿⡿⣿⣿⣷⣄⣀⠈⠢⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣬⢦⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⢸⠘⣿⣿⣯⣷⣿⢿⣾⡿⣟⣿⣟⣯⣿⣿⣿⣿⣶⣶⣶⣤⣤⣀⣀⡀⠀⠀⠀⠀⢀⣠⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢾⠀⠀
+⠀⠀⠀⠀⠀⢀⡼⣆⢹⣿⣿⢷⣿⣻⣯⠿⣛⠫⠭⡍⡭⢭⣙⠻⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠋⡇⠀⠀
+⠀⠀⠀⠀⣰⣍⣶⠛⣄⠙⠻⢿⡛⠍⣆⠳⢌⢣⠓⣬⠱⢦⡩⢝⡲⣌⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠋⢁⡔⢠⠇
+⠀⠀⠀⠀⡟⣷⢣⠘⡄⣓⢄⡀⠉⠳⢬⣚⣌⡲⣉⠦⣋⢖⡩⢎⡵⢊⠷⣡⢿⣿⣿⣯⣿⣿⣿⡿⣿⣿⡿⣿⢿⡿⣿⢿⡿⣿⢿⣿⡿⠿⠛⠁⠀⠀⡎⣀⠎⠀⠀⠀
+⠀⠀⠀⠀⢧⠸⣇⠎⡰⢌⢊⡙⠲⣄⡀⠀⠈⠉⠉⠛⠚⠒⠛⠚⠒⠛⠓⠓⠚⢿⡿⣿⣿⣿⣿⣿⣏⣷⣹⡮⠷⠽⠾⠗⠛⠋⠉⠀⠀⠀⠀⠀⢀⣠⣿⠟⡆⠀⠀⠀
+⠀⠀⠀⠀⢸⠀⠙⢆⡱⣈⠦⣉⠳⢄⢫⠱⠦⣤⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡽⣖⡳⣞⢶⣳⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⣠⣴⣶⢿⡿⠋⠀⡆⠀⠀⠀
+⠀⠀⠀⠀⠘⡆⠀⡀⠑⢦⡒⠥⡚⣌⠲⣉⠞⣰⠪⡝⢭⡓⢶⡒⣖⠲⣖⢲⢖⡺⣿⣷⣿⣾⣷⣿⣿⣤⣤⣤⣤⣤⢶⣶⢻⡟⡿⢯⡿⣽⣳⣯⠟⠁⡔⡀⡇⠀⠀⠀
+⠀⠀⠀⠀⠀⠙⣤⡈⠀⠀⠉⠓⠵⣌⡓⡌⡎⢥⡓⡜⡣⢞⡡⢏⡜⡳⢬⣋⢮⣕⢫⣝⣻⣛⢿⡹⢧⡳⣞⢶⡹⣎⠿⣜⣻⣼⣛⣯⢷⣯⠗⠋⢠⠞⡴⡯⣅⠀⠀⠀
+⠀⠀⠀⢀⠄⠊⢡⣿⣶⣄⠀⠀⠀⠈⠉⠓⠺⢥⣎⡵⣙⢬⠳⣩⢞⡱⢫⡜⡖⢮⣓⠾⣔⢯⣚⡽⣣⢟⡼⣣⡟⣭⠿⣭⣳⣞⡽⠞⠋⠁⠀⠀⣸⠾⡳⢦⡄⠱⢠⠀⠀
+⠀⢀⡔⠁⠀⠀⣿⣿⢯⣟ⷦ⣄⣀⠀⠀⠀⠀⠀⠈⠉⠉⠓⠓⠚⠓⠓⠛⠞⢣⣿⢾⡿⣾⢷⡿⣿⢿⡿⣿⢿⡿⣿⡿⠉⠁⠀⠀⢀⣠⠖⣫⠡⢒⡉⠳⣽⡀⠀⠑⢀⠀
+⢠⠏⢠⠎⠀⠸⡿⣿⣿⣞ⷻ⡾⣽⣻⢶⣦⢤⣤⣀⣀⣀⠀⠀⠀⠀⠀⠀⠀⠘⠻⠷⠿⠾⠷⢯⣽⢾⡽⠛⠋⠛⠋⢁⣀⡤⢴⡚⡍⢆⡓⠤⢃⠥⢨⣱⠏⠀⠈⢢⠈⢣⠀
+⠛⢨⡇⠀⠀⠀⢣⠉⢻⣾⢳⣿⣽⢳⣽⡞⣵⢻⡜⢳⣯⣽⠛⣿⠛⡟⢻⢳⡞⣶⣶⡖⣶⠒⣶⠒⣿⣿⢲⠒⣶⠛⣭⠋⣦⢱⢢⢱⠘⣦⠘⠑⠊⡜⣶⠃⡆⠀⠀⠀
+⣻⠙⡄⠀⠀⠀⠈⠣⡄⠈⠙⠺⢷⣯⣗⣻⡭⣷⢻⡝⣮⢳⡻⣜⢯⡝⣧⢻⠼⣱⢎⡵⢣⣛⣴⣻⣼⣿⣿⣜⣦⣷⣼⣾⣾⣦⢉⡆⢳⡈⢖⣩⠶⠋⠀⢠⠃⠀⠀⠀
+⠸⣤⠐⡄⠀⠀⠀⠀⠈⢦⣑⠠⠀⡀⠈⠉⠛⠺⠷⣯⣳⣏⡷⣹⢮⡝⣮⠽⣭⠳⢮⣙⠧⣽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣏⡶⡬⠗⠚⢉⠀⠀⣀⠔⠁⠀⠀⠀
+⠀⠈⢆⠈⠢⡀⠀⠀⠀⠀⠀⠉⠒⠦⢄⣀⠒⠠⠄⠀⠀⠈⠉⠉⠛⠚⠓⠻⠶⠯⠷⠭⠾⠥⠯⠯⠿⠿⣷⠟⠛⠛⠉⣉⣥⣴⣶⣾⣿⣿⣿⣿⠋⠀⠀⠀⠀⣀⠔⠀
+⠀⠀⠀⠑⢤⠈⠒⠄⡀⠀⠀⠀⠀⠀⠀⠀⠉⠉⠒⠒⠦⠤⠤⣀⣀⣀⣀⡀⠀⠀⢀⣤⣤⣤⣤⣤⣤⣴⢿⣶⣶⡾⣿⠿⣟⣻⢻⣽⣹⠾⠋⠁⠀⠀⢀⠤⠊⢀⡴⠋
+⠀⠀⠀⠀⠀⠈⠒⢄⡈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠀⠘⢥⣈⣆⣑⣪⣑⣎⣭⣓⣬⠷⠼⠿⠚⠋⠉⠀⠀⠀⠀⠀⠀⠈⣀⠤⠚⠉⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠈⠁⠒⠠⣄⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⡠⠔⠚⠉⠁⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠑⠐⠢⠤⠤⣀⣀⣀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣀⣤⠤⠦⠶⠒⠛⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⠁⠉⠈⠁⠉⠈⠁⠈⠁⠁⠈⠉⠉⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 """
 RECIPES = {
     "Scrambled eggs": {"needs": {"Eggs", "Butter", "Milk"}, "fridge": ["Eggs", "Butter", "Milk"]},

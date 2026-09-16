@@ -12,7 +12,7 @@ st.markdown(
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Playfair+Display:wght@600;700&display=swap');
     :root { --ink:#4d3a45; --muted:#806875; --line:#f2d8e3; --paper:#fffdfd; }
     .stApp { background: radial-gradient(circle at top right, #ffe5ef 0, #fffafc 34rem, #fff7fa 100%); color:var(--ink); font-family:'DM Sans', sans-serif; }
-    .block-container { max-width:1180px; padding-top:1rem; padding-bottom:1.5rem; }
+    .block-container { max-width:1180px; padding-top:4.5rem; padding-bottom:1.5rem; }
     h1,h2,h3,h4 { font-family:'Playfair Display', serif; }
     .hero { padding:1rem 1.3rem; border:1px solid var(--line); border-radius:18px; background:linear-gradient(110deg,#fff 15%,#ffe8f0); box-shadow:0 16px 35px rgba(210,126,158,.14); margin-bottom:.8rem; }
     .hero h1 { color:#a95278; margin:0; font-size:2.1rem; }

@@ -1,10 +1,62 @@
 import html
 import random
+import sqlite3
+from pathlib import Path
 
 import streamlit as st
 
 
 st.set_page_config(page_title="Apartment Morning Adventure", page_icon="🏡", layout="wide")
+
+LEADERBOARD_DB = Path(__file__).resolve().parent / "leaderboard.sqlite3"
+
+
+def initialize_leaderboard():
+    with sqlite3.connect(LEADERBOARD_DB) as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS leaderboard (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                score INTEGER NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+
+def get_leaderboard():
+    with sqlite3.connect(LEADERBOARD_DB) as connection:
+        return connection.execute(
+            "SELECT id, name, score FROM leaderboard ORDER BY score DESC, created_at ASC, id ASC LIMIT 5"
+        ).fetchall()
+
+
+def find_leaderboard_name(name):
+    with sqlite3.connect(LEADERBOARD_DB) as connection:
+        return connection.execute(
+            "SELECT id, name, score FROM leaderboard WHERE name = ? COLLATE NOCASE ORDER BY score DESC, id ASC LIMIT 1",
+            (name,),
+        ).fetchone()
+
+
+def add_leaderboard_score(name, score):
+    with sqlite3.connect(LEADERBOARD_DB) as connection:
+        connection.execute(
+            "INSERT INTO leaderboard (name, score) VALUES (?, ?)",
+            (name, score),
+        )
+
+
+def replace_leaderboard_score(entry_id, name, score):
+    with sqlite3.connect(LEADERBOARD_DB) as connection:
+        connection.execute(
+            "UPDATE leaderboard SET name = ?, score = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (name, score, entry_id),
+        )
+
+
+initialize_leaderboard()
 
 st.markdown(
     """
@@ -17,6 +69,18 @@ st.markdown(
     .hero { padding:1rem 1.3rem; border:1px solid var(--line); border-radius:18px; background:linear-gradient(110deg,#fff 15%,#ffe8f0); box-shadow:0 16px 35px rgba(210,126,158,.14); margin-bottom:.8rem; }
     .hero h1 { color:#a95278; margin:0; font-size:2.1rem; }
     .hero p { color:var(--muted); margin:.35rem 0 0; }
+    .leaderboard-card { overflow:hidden; border:1px solid var(--line); border-radius:18px; background:rgba(255,255,255,.94); box-shadow:0 12px 30px rgba(210,126,158,.12); }
+    .leaderboard-table { width:100%; border-collapse:collapse; color:var(--ink); font-size:1rem; }
+    .leaderboard-table th { padding:.9rem 1.1rem; color:#a95278; background:#fff5f8; text-align:left; font-size:.78rem; text-transform:uppercase; letter-spacing:.1em; }
+    .leaderboard-table td { padding:.85rem 1.1rem; border-top:1px solid #f7e8ed; }
+    .leaderboard-table tbody tr { background:#fff; }
+    .leaderboard-place { width:22%; font-weight:700; color:#a95278; }
+    .leaderboard-name { font-weight:500; }
+    .leaderboard-table tbody tr:nth-child(-n+3) .leaderboard-name { color:#a95278; font-weight:700; }
+    .leaderboard-table tbody tr:nth-child(n+4) td { color:#000; }
+    .leaderboard-score { text-align:right; font-weight:700; font-variant-numeric:tabular-nums; }
+    .leaderboard-empty { padding:1.5rem !important; color:var(--muted); text-align:center; }
+    .st-key-leaderboard_back_button { margin-top:1.5rem; }
     .welcome-screen { width:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; }
     .welcome-card { width:min(100%, 650px); text-align:center; }
     .welcome-card .hero { padding:2.2rem 2rem; border-radius:24px; }
@@ -25,11 +89,16 @@ st.markdown(
     form:has(.welcome-card) { width:min(100%, 650px); min-height:78vh; box-sizing:border-box; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:2rem; border:0; background:transparent; box-shadow:none; margin:0 auto; }
     form:has(.welcome-card) .welcome-card { width:100%; }
     form:has(.welcome-card) .welcome-card .hero { padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; margin-bottom:1.2rem; }
-    form:has(.welcome-card) button { display:block; width:180px; margin:1rem auto 0; }
-    [data-testid="stForm"] { width:min(100%, 650px); min-height:78vh; box-sizing:border-box; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:2rem; border:0; background:transparent; box-shadow:none; margin:0 auto; }
-    [data-testid="stForm"] > div { height:auto; flex:0 0 auto; }
-    [data-testid="stForm"] [data-testid="stFormSubmitButton"] { width:180px; margin:1rem auto 0; }
-    form:has(.welcome-card), [data-testid="stForm"] { width:min(100%, 650px) !important; min-height:78vh !important; box-sizing:border-box; }
+    form:has(.welcome-card) button { display:block; width:180px; margin:.07rem auto 0; }
+    [data-testid="stForm"]:has(.welcome-card) { width:min(100%, 650px); min-height:78vh; box-sizing:border-box; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:2rem; border:0; background:transparent; box-shadow:none; margin:0 auto; }
+    [data-testid="stForm"]:has(.welcome-card) > div { height:auto; flex:0 0 auto; }
+    [data-testid="stForm"]:has(.welcome-card) [data-testid="stVerticalBlock"] { gap:14px; }
+    [data-testid="stForm"]:has(.welcome-card) [data-testid="stFormSubmitButton"] { width:180px; margin:.07rem auto 0; }
+    .st-key-leaderboard_button button { background:#fff !important; color:#a95278 !important; border:1px solid var(--line) !important; }
+    form:has(.welcome-card), [data-testid="stForm"]:has(.welcome-card) { width:min(100%, 650px) !important; min-height:78vh !important; box-sizing:border-box; }
+    [data-testid="stDialog"] { background:rgba(255,255,255,.72) !important; }
+    [role="dialog"] { width:min(420px, calc(100vw - 2rem)) !important; background:#fff !important; color:var(--ink) !important; }
+    [role="dialog"] input { background:#fff !important; }
     .panel { background:rgba(255,255,255,.88); border:1px solid var(--line); border-radius:16px; padding:.8rem 1rem; box-shadow:0 8px 22px rgba(210,126,158,.1); margin-bottom:.7rem; }
     .story { height:260px; overflow:auto; padding:.8rem; border:1px solid var(--line); border-radius:12px; background:var(--paper); display:flex; flex-direction:column; justify-content:flex-end; gap:.45rem; }
     .story p { margin:0; line-height:1.5; }
@@ -96,11 +165,13 @@ BACKPACK_ITEMS = [("Computer", 10), ("Computer charger", 10), ("Waterbottle", 10
 
 
 def init_game():
-    st.session_state.update(health=50, temperature=random.randint(20, 81), story=["The morning sun spills across your apartment, and your day is about to begin.", ACTION_BREAK], stage="intro", backpack=[], recipe=None, ingredients=[], source=None, room=None, completed_rooms=[], outfit_base_health=None, pancake_shown=False, makeup_then_hair=False)
+    st.session_state.update(health=50, temperature=random.randint(20, 81), story=["The morning sun spills across your apartment, and your day is about to begin.", ACTION_BREAK], stage="intro", screen="welcome", leaderboard_return_screen="welcome", backpack=[], recipe=None, ingredients=[], source=None, room=None, completed_rooms=[], outfit_base_health=None, pancake_shown=False, makeup_then_hair=False, score_dialog_open=False, pending_score_submission=None, score_saved=False, submitted_score_name="")
 
 
 if "stage" not in st.session_state:
     init_game()
+elif "screen" not in st.session_state:
+    st.session_state.screen = "welcome" if st.session_state.stage == "intro" else "game"
 
 
 def tell(text):
@@ -157,16 +228,116 @@ def choose_outfit(item, category):
     reward(5 if good else -15, "Good choice! You will be comfortable. Happiness increases by 5." if good else "Bad choice! That outfit does not suit the weather. Happiness decreases by 15.")
 
 
+def dismiss_score_submission():
+    st.session_state.score_dialog_open = False
+    st.session_state.pending_score_submission = None
+
+
+@st.dialog("Add your score", width="small", on_dismiss=dismiss_score_submission)
+def score_submission_dialog():
+    pending = st.session_state.pending_score_submission
+    if pending:
+        st.metric("Your score", pending["score"])
+        st.write(
+            f'"{pending["name"]}" is already on the leaderboard. '
+            "Would you like to replace that entry or add a new row?"
+        )
+        replace_column, add_column = st.columns(2)
+        if replace_column.button("Replace existing entry", type="primary", use_container_width=True):
+            replace_leaderboard_score(pending["existing_id"], pending["name"], pending["score"])
+            st.session_state.score_saved = True
+            st.session_state.submitted_score_name = pending["name"]
+            st.session_state.pending_score_submission = None
+            st.session_state.score_dialog_open = False
+            st.rerun()
+        if add_column.button("Add a new row", use_container_width=True):
+            add_leaderboard_score(pending["name"], pending["score"])
+            st.session_state.score_saved = True
+            st.session_state.submitted_score_name = pending["name"]
+            st.session_state.pending_score_submission = None
+            st.session_state.score_dialog_open = False
+            st.rerun()
+        if st.button("Cancel", key="cancel_duplicate_score"):
+            st.session_state.pending_score_submission = None
+            st.session_state.score_dialog_open = False
+            st.rerun()
+        return
+
+    st.metric("Your score", st.session_state.health)
+    with st.form("score_submission_form"):
+        player_name = st.text_input("Name", max_chars=40, key="leaderboard_player_name")
+        submitted = st.form_submit_button("Add to leaderboard", type="primary", use_container_width=True)
+    if submitted:
+        name = player_name.strip()
+        if not name:
+            st.error("Enter a name before adding your score.")
+        else:
+            existing_entry = find_leaderboard_name(name)
+            if existing_entry:
+                st.session_state.pending_score_submission = {
+                    "existing_id": existing_entry[0],
+                    "name": name,
+                    "score": st.session_state.health,
+                }
+                st.rerun()
+            else:
+                add_leaderboard_score(name, st.session_state.health)
+                st.session_state.score_saved = True
+                st.session_state.submitted_score_name = name
+                st.session_state.score_dialog_open = False
+                st.rerun()
+    if st.button("Cancel", key="cancel_score_submission"):
+        st.session_state.score_dialog_open = False
+        st.rerun()
+
+
+if "score_dialog_open" not in st.session_state:
+    st.session_state.score_dialog_open = False
+    st.session_state.pending_score_submission = None
+    st.session_state.score_saved = False
+    st.session_state.submitted_score_name = ""
+
+if st.session_state.score_dialog_open:
+    score_submission_dialog()
+    st.stop()
+
+
+if st.session_state.screen == "leaderboard":
+    st.markdown('<div class="hero"><div class="eyebrow">Apartment Morning Adventure</div><h1>Leaderboard</h1><p>Top happiness scores from completed mornings.</p></div>', unsafe_allow_html=True)
+    leaderboard = get_leaderboard()
+    if leaderboard:
+        rows = "".join(
+            f'<tr><td class="leaderboard-place">{place}</td><td class="leaderboard-name">{html.escape(name)}</td><td class="leaderboard-score">{score}</td></tr>'
+            for place, (_, name, score) in enumerate(leaderboard, start=1)
+        )
+    else:
+        rows = '<tr><td class="leaderboard-empty" colspan="3">No scores yet. Be the first to add yours!</td></tr>'
+    st.markdown(
+        '<div class="leaderboard-card"><table class="leaderboard-table"><thead><tr><th>Place</th><th>Name</th><th style="text-align:right">Score</th></tr></thead>'
+        f"<tbody>{rows}</tbody></table></div>",
+        unsafe_allow_html=True,
+    )
+    if st.button("Back", type="primary", key="leaderboard_back_button"):
+        st.session_state.screen = st.session_state.leaderboard_return_screen
+        st.rerun()
+    st.stop()
+
+
 if st.session_state.stage == "intro":
     with st.form("welcome_form"):
         st.markdown('<div class="welcome-screen"><div class="welcome-card"><div class="hero"><div class="eyebrow">A cozy text adventure</div><h1>Apartment Morning Adventure</h1><p>Get ready, gather your things, and make it out the door with your happiness intact.</p></div></div></div>', unsafe_allow_html=True)
         _, welcome_button, _ = st.columns([1, 1, 1])
         with welcome_button:
             if st.form_submit_button("Start my morning", type="primary", use_container_width=True):
+                st.session_state.screen = "game"
                 tell("You wake up in your big, comfy bed, perfectly content with staying there all day.")
                 tell("Unfortunately, it is a school day and you have lots to do.")
                 tell("You really should get out of bed, but what do you want to do?")
                 reroute("bed_choice")
+            if st.form_submit_button("Leaderboard", type="secondary", use_container_width=True, key="leaderboard_button"):
+                st.session_state.leaderboard_return_screen = "welcome"
+                st.session_state.screen = "leaderboard"
+                st.rerun()
     st.stop()
 
 
@@ -348,8 +519,26 @@ with left:
         score = st.session_state.health
         note = "You did amazing!" if score > 100 else "You did good!" if score >= 50 else "Do more things that make you happy tomorrow."
         st.markdown(f'<div class="panel"><h2>You made it out the door</h2><p>Thanks for playing. Your happiness ended at <strong>{score}</strong>.</p><p>{note}</p></div>', unsafe_allow_html=True)
+        if st.session_state.score_saved:
+            st.success(f"Score added to the leaderboard for {st.session_state.submitted_score_name}.")
+            if st.button("View leaderboard", type="secondary", use_container_width=True, key="ending_view_leaderboard_button"):
+                st.session_state.leaderboard_return_screen = "game"
+                st.session_state.screen = "leaderboard"
+                st.rerun()
+        elif st.button("Add your score to leaderboard", type="secondary", use_container_width=True, key="add_ending_score_button"):
+            st.session_state.score_dialog_open = True
+            st.rerun()
     elif stage == "game_over":
         st.markdown('<div class="panel"><h2>Game Over</h2><p>Your happiness reached zero. The morning went completely off the rails.</p></div>', unsafe_allow_html=True)
+        if st.session_state.score_saved:
+            st.success(f"Score added to the leaderboard for {st.session_state.submitted_score_name}.")
+            if st.button("View leaderboard", type="secondary", use_container_width=True, key="game_over_view_leaderboard_button"):
+                st.session_state.leaderboard_return_screen = "game"
+                st.session_state.screen = "leaderboard"
+                st.rerun()
+        elif st.button("Add your score to leaderboard", type="secondary", use_container_width=True, key="add_game_over_score_button"):
+            st.session_state.score_dialog_open = True
+            st.rerun()
 
 with right:
     st.markdown('<div class="panel"><div class="eyebrow">Current status</div><div class="metric"><span>Happiness</span><strong>{}</strong></div><div class="meter"><span style="width:{}%"></span></div><p style="color:#806875">Outside temperature: <strong>{}°</strong></p></div>'.format(st.session_state.health, min(max(st.session_state.health, 0), 100), st.session_state.temperature), unsafe_allow_html=True)
@@ -361,4 +550,8 @@ with right:
     st.markdown(f'<div class="panel"><div class="eyebrow">Backpack</div>{backpack}</div>', unsafe_allow_html=True)
     if st.button("Start over", use_container_width=True):
         init_game()
+        st.rerun()
+    if st.session_state.stage not in {"ending", "game_over"} and st.button("Leaderboard", type="secondary", use_container_width=True, key="gameplay_leaderboard_button"):
+        st.session_state.leaderboard_return_screen = "game"
+        st.session_state.screen = "leaderboard"
         st.rerun()

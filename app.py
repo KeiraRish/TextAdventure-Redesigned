@@ -1,9 +1,15 @@
 import html
+import json
 import random
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 import streamlit as st
+from streamlit.errors import StreamlitSecretNotFoundError
 
 
 st.set_page_config(page_title="Apartment Morning Adventure", page_icon="🏡", layout="wide")
@@ -11,7 +17,56 @@ st.set_page_config(page_title="Apartment Morning Adventure", page_icon="🏡", l
 LEADERBOARD_DB = Path(__file__).resolve().parent / "leaderboard.sqlite3"
 
 
+def supabase_config():
+    try:
+        config = st.secrets["supabase"]
+    except (KeyError, StreamlitSecretNotFoundError):
+        return None
+
+    try:
+        url = config["url"].rstrip("/")
+        api_key = config["anon_key"]
+    except KeyError as error:
+        raise RuntimeError("Configure both [supabase].url and [supabase].anon_key in Streamlit secrets.") from error
+
+    if not url or not api_key:
+        raise RuntimeError("Configure both [supabase].url and [supabase].anon_key in Streamlit secrets.")
+    return url, api_key
+
+
+def supabase_request(method, resource, params=None, payload=None, prefer=None):
+    config = supabase_config()
+    if config is None:
+        raise RuntimeError("Supabase leaderboard storage is not configured.")
+    url, api_key = config
+    query = f"?{urlencode(params)}" if params else ""
+    request = Request(
+        f"{url}/rest/v1/{resource}{query}",
+        data=json.dumps(payload).encode("utf-8") if payload is not None else None,
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            **({"Prefer": prefer} if prefer else {}),
+        },
+        method=method,
+    )
+
+    try:
+        with urlopen(request, timeout=10) as response:
+            body = response.read()
+    except HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Supabase leaderboard request failed (HTTP {error.code}): {detail}") from error
+    except URLError as error:
+        raise RuntimeError(f"Could not reach Supabase leaderboard: {error.reason}") from error
+
+    return json.loads(body) if body else None
+
+
 def initialize_leaderboard():
+    if supabase_config() is not None:
+        return
     with sqlite3.connect(LEADERBOARD_DB) as connection:
         connection.execute(
             """
@@ -26,6 +81,17 @@ def initialize_leaderboard():
 
 
 def get_leaderboard():
+    if supabase_config() is not None:
+        rows = supabase_request(
+            "GET",
+            "leaderboard",
+            {
+                "select": "id,name,score",
+                "order": "score.desc,created_at.asc,id.asc",
+                "limit": "5",
+            },
+        )
+        return [(row["id"], row["name"], row["score"]) for row in rows]
     with sqlite3.connect(LEADERBOARD_DB) as connection:
         return connection.execute(
             "SELECT id, name, score FROM leaderboard ORDER BY score DESC, created_at ASC, id ASC LIMIT 5"
@@ -33,6 +99,22 @@ def get_leaderboard():
 
 
 def find_leaderboard_name(name):
+    if supabase_config() is not None:
+        escaped_name = name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_").replace('"', '\\"')
+        rows = supabase_request(
+            "GET",
+            "leaderboard",
+            {
+                "select": "id,name,score",
+                "name": f'ilike."{escaped_name}"',
+                "order": "score.desc,id.asc",
+                "limit": "1",
+            },
+        )
+        if rows:
+            row = rows[0]
+            return row["id"], row["name"], row["score"]
+        return None
     with sqlite3.connect(LEADERBOARD_DB) as connection:
         return connection.execute(
             "SELECT id, name, score FROM leaderboard WHERE name = ? COLLATE NOCASE ORDER BY score DESC, id ASC LIMIT 1",
@@ -41,6 +123,14 @@ def find_leaderboard_name(name):
 
 
 def add_leaderboard_score(name, score):
+    if supabase_config() is not None:
+        supabase_request(
+            "POST",
+            "leaderboard",
+            payload={"name": name, "score": score},
+            prefer="return=minimal",
+        )
+        return
     with sqlite3.connect(LEADERBOARD_DB) as connection:
         connection.execute(
             "INSERT INTO leaderboard (name, score) VALUES (?, ?)",
@@ -49,6 +139,21 @@ def add_leaderboard_score(name, score):
 
 
 def replace_leaderboard_score(entry_id, name, score):
+    if supabase_config() is not None:
+        rows = supabase_request(
+            "PATCH",
+            "leaderboard",
+            {"id": f"eq.{entry_id}", "select": "id"},
+            {
+                "name": name,
+                "score": score,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+            prefer="return=representation",
+        )
+        if not rows:
+            raise RuntimeError("The selected leaderboard entry no longer exists.")
+        return
     with sqlite3.connect(LEADERBOARD_DB) as connection:
         connection.execute(
             "UPDATE leaderboard SET name = ?, score = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?",

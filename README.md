@@ -36,6 +36,6 @@ For shared leaderboard entries that survive app restarts and are visible across 
    anon_key = "YOUR_SUPABASE_ANON_KEY"
    ```
 
-   The URL and anon key are available in the Supabase project's API settings. Do not put secrets in the repository.
+   The URL and anon key are available in the Supabase project's API settings. Use the project URL (without `/rest/v1`). Do not put secrets in the repository.
 
 When these secrets are present, the app reads and writes the shared Supabase table. Without them, local development uses `leaderboard.sqlite3`; that local fallback is not shared between app instances and may not survive restarts on hosts with ephemeral filesystems.

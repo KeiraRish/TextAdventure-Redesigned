@@ -1,2 +1,3 @@
 leaderboard.sqlite3
 leaderboard.sqlite3-*
+/.streamlit/secrets.toml

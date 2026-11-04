@@ -25,6 +25,8 @@ def supabase_config():
 
     try:
         url = config["url"].rstrip("/")
+        if url.endswith("/rest/v1"):
+            url = url[:-len("/rest/v1")]
         api_key = config["anon_key"]
     except KeyError as error:
         raise RuntimeError("Configure both [supabase].url and [supabase].anon_key in Streamlit secrets.") from error
